@@ -92,9 +92,15 @@ def wait_for_tilt(seconds=15):
     global sg_read
     global found_tilt
 
+    scanned = 0
     while not scan_done:
         print("Still scanning")
-        sleep(0.5)
+        sleep(1)
+        scanned = scanned + 1
+        if scanned > seconds:
+            print("Giving up")
+            ble.gap_scan(None) 
+
     ble.active(False)
 
     if found_tilt:

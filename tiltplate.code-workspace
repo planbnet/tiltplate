@@ -1,15 +1,8 @@
 {
 	"folders": [
 		{
-			"path": "../Inkplate-micropython"
-		},
-		{
 			"name": "tiltplate",
 			"path": "."
-		},
-		{
-			"name": "serial://dev/tty.usbserial-14310",
-			"uri": "serial:///dev/tty.usbserial-14310/"
 		},
 		{
 			"name": "serial://dev/tty.usbserial-14310",

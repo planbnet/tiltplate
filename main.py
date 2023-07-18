@@ -82,6 +82,9 @@ if needs_display:
     display = Inkplate()
     display.begin()
     imageutil.display_image(display, png_file_path)
+    if first_boot:
+        display.display()
+        needs_display = False
 
 print("Wait for tilt")
 current_temp, current_gravity = wait_for_tilt() # wait for tilt for max 15 secs
@@ -128,6 +131,7 @@ if needs_send:
     #TODO: Handle failure?
 
 if needs_display:
+    print("Refresh display")
     display.display()    
 
 rtcdata = {
@@ -136,7 +140,10 @@ rtcdata = {
     "gravity": current_gravity,
     "imgfile": png_file_path
 }
-rtc.memory(json.dumps(rtcdata))
+datastr = json.dumps(rtcdata)
+print(f"Store to rtc: \n{datastr}")
+rtc.memory(datastr)
 
 if not debug:
+    print(f"Going to sleep for {sleep_minutes} minutes")
     machine.deepsleep(sleep_minutes * 60 * 1000)
