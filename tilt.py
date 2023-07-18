@@ -78,13 +78,28 @@ def bt_irq(event, data):
 
 def start_scan():
     global scan_done
+    global temp_f
+    global sg_read
     global found_tilt
 
+    temp_f = None
+    sg_read = None
     found_tilt = False
-    ble.active(True)
     scan_done = False
+
+    ble.active(True)
     ble.irq(bt_irq)
     ble.gap_scan(0,500000,500000)
+
+def query_tilt():
+    global scan_done
+    global temp_f
+    global sg_read
+    global found_tilt
+    if scan_done and found_tilt:
+        return temp_f, sg_read
+    else:
+        return None, None
 
 def wait_for_tilt(seconds=15):
     global scan_done

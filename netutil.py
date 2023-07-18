@@ -1,7 +1,7 @@
 
 import network
 
-from secrets import WIFI_SSID, WIFI_PASSWORD
+from mysecrets import WIFI_SSID, WIFI_PASSWORD
 
 # Function which connects to WiFi
 # More info here: https://docs.micropython.org/en/latest/esp8266/tutorial/network_basics.html
