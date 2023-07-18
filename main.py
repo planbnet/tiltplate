@@ -9,14 +9,13 @@ import urequests
 
 from mysecrets import BREWFATHER_KEY
 
-DEBUG = True   #prevent deep sleep
+DEBUG = False   #prevent deep sleep
 
 SLEEP_MINUTES=15
 WAIT_FOR_TILT_SECONDS = 5
 DEFAULT_FILE="tiltbridge-1.png"
 SEND_INTERVAL_HOURS=5 # Interval after which data is resent even if not changed
 BREWFATHER_URL=f"http://log.brewfather.net/stream?id={BREWFATHER_KEY}"
-
 
 needs_display = False
 needs_wifi = False
@@ -45,32 +44,30 @@ start_scan()
 if machine.wake_reason() == machine.DEEPSLEEP:
     print('Wake from deep sleep')
     first_boot = False
-
-try:
-    data_restored = json.loads(rtc.memory())
-    print("Data restored:", data_restored)
-    rtcdata = data_restored
-    first_boot = False
-    png_file_path=rtcdata.get("imgfile", DEFAULT_FILE)
-    last_run=rtcdata.get("last_run", 0)
-    last_gravity=rtcdata.get("gravity")
-    last_temp=rtcdata.get("temp")
-    last_beer_name=rtcdata.get("beer_name", "")
-    print(f"loaded last_beer_name: {last_beer_name}")
-    print(f"loaded png_file_path: {png_file_path}")
-    print(f"loaded last_gravity: {last_gravity}")
-    print(f"loaded last_temp: {last_temp}")
-    print(f"loaded last_run: {last_run}")
-except (ValueError, TypeError):
-    print("No data available or data is corrupt")
-    first_boot = True
+    try:
+        data_restored = json.loads(rtc.memory())
+        print("Data restored:", data_restored)
+        rtcdata = data_restored
+        first_boot = False
+        png_file_path=rtcdata.get("imgfile", DEFAULT_FILE)
+        last_run=rtcdata.get("last_run", 0)
+        last_gravity=rtcdata.get("gravity")
+        last_temp=rtcdata.get("temp")
+        last_beer_name=rtcdata.get("beer_name", "")
+        print(f"loaded last_beer_name: {last_beer_name}")
+        print(f"loaded png_file_path: {png_file_path}")
+        print(f"loaded last_gravity: {last_gravity}")
+        print(f"loaded last_temp: {last_temp}")
+        print(f"loaded last_run: {last_run}")
+    except (ValueError, TypeError):
+        print("No data available or data is corrupt")
+        first_boot = True
 
 if first_boot:
     print('First boot')
     needs_time = True
     needs_update = True
     needs_display = True
-
 
 if needs_wifi or needs_time or needs_update:
     print("Request wifi")
@@ -116,21 +113,21 @@ else:
         needs_send = True
   
     #212x104
-    display.setTextSize(3)
+    display.setTextSize(2)
     degc_string = ""
     plato_string = ""
     if current_gravity is not None:
         gravity_float = current_gravity / 1000
         plato = -616.868 + (1111.14 * gravity_float) - (630.272 * gravity_float**2) + (135.997 * gravity_float**3)
-        plato_string = f"{plato:.1f}°P"
+        plato_string = f"{plato:.1f} P"
     if current_temp is not None:
         degc = (current_temp - 32) * 5/9
-        degc_string = f"{degc:.1f}°C"
+        degc_string = f"{degc:.1f} C"
 
     print(plato_string) 
     print(degc_string) 
-    display.printText(10, 70, plato_string, c=Inkplate.BLACK)
-    display.printText(110, 70, degc_string, c=Inkplate.BLACK)
+    display.printText(10, 85, plato_string, c=Inkplate.BLACK)
+    display.printText(120, 85, degc_string, c=Inkplate.BLACK)
     needs_display = True
 
 if needs_send:
