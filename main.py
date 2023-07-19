@@ -6,13 +6,15 @@ from netutil import do_connect
 from tilt import start_scan, wait_for_tilt, query_tilt
 import imageutil
 import urequests
+import sys
+
 
 from mysecrets import BREWFATHER_KEY
 
 DEBUG = False   #prevent deep sleep
 
-SLEEP_MINUTES=15
-WAIT_FOR_TILT_SECONDS = 5
+SLEEP_MINUTES=1
+WAIT_FOR_TILT_SECONDS = 15
 DEFAULT_FILE="tiltbridge-1.png"
 SEND_INTERVAL_HOURS=5 # Interval after which data is resent even if not changed
 BREWFATHER_URL=f"http://log.brewfather.net/stream?id={BREWFATHER_KEY}"
@@ -35,6 +37,7 @@ last_run = 0
 last_temp=None
 last_gravity=None
 last_beer_name=""
+beer_name=""
 
 rtc = machine.RTC()
 
@@ -80,33 +83,49 @@ if needs_time:
     print('Local time:', rtc.datetime())
 
 if needs_update:
-    beer_name, img_src = imageutil.get_beer()
-    if beer_name != last_beer_name:
-        print(f"Found new beer/info {beer_name}")
-        needs_image = True
+    try:
+        beer_name, img_src = imageutil.get_beer()
+        if beer_name != last_beer_name:
+            print(f"Found new beer/info {beer_name}")
+            needs_image = True
+    except Exception as e:
+        print("Could not load beer info")
+        sys.print_exception(e)
+else:
+    beer_name = last_beer_name
 
 if needs_image:
     print("Load image")
-    png_file_path=imageutil.download_image(img_src)
-    needs_display=True
+    try:
+        png_file_path=imageutil.download_image(img_src)
+        needs_display=True
+    except Exception as e:
+        print("Could not load beer image")
+        sys.print_exception(e)
 
-if needs_display:
-    print("Update display")
-    display = Inkplate()
-    display.begin()
-    imageutil.display_image(display, png_file_path)
-    if first_boot:
-        current_temp, current_gravity = query_tilt()
-        if current_temp is None:
-            print("No tilt data available yet but first boot, draw image immediately instead of waiting for tilt")
-            display.display()
-            needs_display = False
+
+print("Update display")
+display = Inkplate()
+display.begin()
+imageutil.display_image(display, png_file_path)
+
+if first_boot:
+    current_temp, current_gravity = query_tilt()
+    if current_temp is None:
+        print("No tilt data available yet but first boot, draw image immediately instead of waiting for tilt")
+        display.display()
+        needs_display = False
 
 print("Wait for tilt")
 current_temp, current_gravity = wait_for_tilt(WAIT_FOR_TILT_SECONDS)
 
 if current_temp is None:
     print("No tilt data found")
+    if last_temp is not None:
+        print("Last temp was set, refresh")
+        needs_display: True
+elif current_temp > 250:
+    print("Invalid tilt data")
 else:
     print(f"Temp: {current_temp} Gravity:{current_gravity}")
     if first_boot or current_temp != last_temp or current_gravity != last_gravity or time.time() - last_run > (SEND_INTERVAL_HOURS * 60 * 60):
@@ -140,9 +159,18 @@ if needs_send:
         "gravity": (current_gravity / 1000.0)
     }
     print(data)
-    response = urequests.post(BREWFATHER_URL, json=data)
-    print(response.text)
-    #TODO: Handle failure?
+    try:
+        response = urequests.post(BREWFATHER_URL, json=data)
+        print(response.text)
+    except Exception as e:
+        print("Could update brefather")
+        sys.print_exception(e)
+        display.printText(147, 1, "Error", c=Inkplate.BLACK)
+        display.printText(148, 0, "Error", c=Inkplate.BLACK)
+        display.printText(148, 1, "Error", c=Inkplate.BLACK)        
+        display.printText(149, 2, "Error", c=Inkplate.BLACK)        
+        display.printText(147, 0, "Error", c=Inkplate.WHITE)
+        needs_display = True
 
 if needs_display:
     print("Refresh display")
