@@ -86,7 +86,7 @@ def start_scan():
     sg_read = None
     found_tilt = False
     scan_done = False
-
+    print("Enable BLE")
     ble.active(True)
     ble.irq(bt_irq)
     ble.gap_scan(0,500000,500000)
@@ -101,7 +101,7 @@ def query_tilt():
     else:
         return None, None
 
-def wait_for_tilt(seconds=15):
+def wait_for_tilt(seconds=15, reboot_on_failure=False):
     global scan_done
     global temp_f
     global sg_read
@@ -111,12 +111,21 @@ def wait_for_tilt(seconds=15):
     while not scan_done:
         print("Still scanning")
         sleep(1)
+        
         scanned = scanned + 1
         if scanned > seconds:
             print("Giving up")
-            ble.gap_scan(None) 
+            ble.gap_scan(None)
+            #this only seems to work on first boot
+            if reboot_on_failure:
+                import machine
+                machine.reset()
 
-    ble.active(False)
+
+    #print("Disable BLE")
+    #ble.active(False)
+
+    print("Return data")
 
     if found_tilt:
         return temp_f, sg_read
