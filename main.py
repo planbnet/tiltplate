@@ -12,18 +12,18 @@ from timeutil import update_time, format_time
 
 from umqtt import MQTTClient
 
-from mysecrets import BREWFATHER_KEY
+from mysecrets import BREWFATHER_KEY, BROKER_ADDR
 
 DEBUG = False   #prevent deep sleep
 
-SLEEP_MINUTES=15
+SLEEP_MINUTES=2
 WAIT_FOR_TILT_SECONDS=15
 DEFAULT_FILE="tiltbridge-1.png"
 SEND_INTERVAL_HOURS=5 # Interval after which data is resent even if not changed
 BREWFATHER_URL=f"http://log.brewfather.net/stream?id={BREWFATHER_KEY}"
 
 needs_display = False
-needs_wifi = False
+needs_wifi = True
 needs_time = False
 needs_image = False
 needs_update = False
@@ -108,7 +108,6 @@ if first_boot:
     needs_time = True
     needs_update = True
     needs_display = True
-
 
 try:
 
@@ -198,11 +197,11 @@ try:
         print_display(degc_string, 120, 85, fontSize=2)
         needs_display = True
         if needs_mqtt:
-            CLIENT_NAME = 'tiltplate'
-            BROKER_ADDR = '192.168.10.222'
-            mqttc = MQTTClient(CLIENT_NAME, BROKER_ADDR, keepalive=60)
+            mqttc = MQTTClient('tiltplate', BROKER_ADDR, keepalive=60)
             try:
-                mqttc.connect()        
+                mqttc.connect()     
+                mqttc.publish("tilt/plato", f"{plato:.1f}")   
+                mqttc.publish("tilt/temp", f"{degc:.1f}") 
             except Exception as e:
                 print("Could update mqtt")
                 sys.print_exception(e)
@@ -243,7 +242,7 @@ try:
     brewfather_update = format_time(last_update)
     if last_update == 0:
         brewfather_update = "n/a"
-    print_display(f"Tilt: {tilt_update} Brewfather: {brewfather_update}", 3, 70, Inkplate.WHITE, fontSize=1, shadow=True)
+    print_display(f"Tilt: {tilt_update} Brewfather: {brewfather_update}", 3, 73, Inkplate.WHITE, fontSize=1, shadow=True)
 
     if needs_display:
         print("Refresh display")
@@ -268,3 +267,7 @@ try:
 except Exception as e:
     print("Error")
     display_error(e) 
+    print(f"Going to sleep for {SLEEP_MINUTES} minutes")
+    machine.deepsleep(int(SLEEP_MINUTES * 60 * 1000))
+    
+    
