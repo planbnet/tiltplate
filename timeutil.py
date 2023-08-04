@@ -24,14 +24,26 @@ def update_time():
     ntptime.settime()
     rtc = RTC()
     # Get UTC time tuple
-    utc_time = rtc.datetime()
+    rtc_time = rtc.datetime()
     # Calculate timezone offset in seconds (3600 per hour)
-    offset = 3600 * (2 if is_summer_time(utc_time) else 1)
+    offset = 3600 * (2 if is_summer_time(rtc_time) else 1)
+
     # Convert UTC datetime tuple to seconds since epoch
-    utc_seconds = utime.mktime(utc_time)
+    # work around a bug in rtc, which stores values of time tuple wrong
+    utc_seconds = utime.mktime( (rtc_time[0], rtc_time[1], rtc_time[2], rtc_time[4], rtc_time[5], rtc_time[6], 0, 0) )
+
     # Apply the offset (add for CET/CEST)
     local_seconds = utc_seconds + offset
     # Convert the result back into a time tuple
     local_time = utime.localtime(local_seconds)
-    # Set the RTC to the local time
-    rtc.datetime(local_time)
+
+    new_time = (local_time[0], local_time[1], local_time[2], local_time[6], local_time[3], local_time[4], local_time[5], local_time[7]) 
+
+    # Set the RTC to the local time, revert the bug
+    rtc.datetime(new_time)
+
+def format_time(timestamp):
+  local_time = utime.localtime(timestamp)
+  hours = local_time[3]
+  minutes = local_time[4]
+  return "{:02d}:{:02d}".format(hours, minutes)
