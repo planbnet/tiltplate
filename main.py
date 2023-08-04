@@ -7,6 +7,10 @@ import imageutil
 import urequests
 import sys
 import machine
+from uio import StringIO
+from timeutil import update_time, format_time
+
+from umqtt import MQTTClient
 
 from mysecrets import BREWFATHER_KEY
 
@@ -26,6 +30,7 @@ needs_update = False
 needs_send = False
 
 first_boot = True
+needs_mqtt = True
 
 png_file_path = DEFAULT_FILE
 
@@ -40,6 +45,32 @@ last_beer_name=""
 beer_name=""
 
 rtc = machine.RTC()
+
+def print_display(text, x=0, y=0, color=Inkplate.BLACK, fontSize=1, shadow=False):
+    display.setTextSize(fontSize)
+    background = Inkplate.BLACK
+    if color == Inkplate.BLACK:
+        background = Inkplate.WHITE
+    line_height = 10 * fontSize
+    lines = text.split('\n')
+    for i, line in enumerate(lines):
+        line = line.strip()
+        y_position = i * line_height + y
+        if shadow:
+            display.printText(x+1, y_position, line, c=background)
+            display.printText(x+1, y_position+1, line, c=background)
+            display.printText(x, y_position+1, line, c=background)
+        display.printText(x, y_position, line, c=color)    
+
+def display_error(e, line_height=10):
+    import sys
+    from io import StringIO
+    sys.print_exception(e)
+    s = StringIO()
+    sys.print_exception(e, s)  
+    display.clearDisplay()
+    print_display(s.getvalue())
+    display.display()
 
 # Start scan early because it runs in the background
 start_scan()
@@ -69,14 +100,15 @@ print(f"last_temp: {last_temp}")
 print(f"last_run: {last_run}")
 print(f"last_update: {last_update}")
 
+display = Inkplate()
+display.begin()
+
 if first_boot:
     print('First boot')
     needs_time = True
     needs_update = True
     needs_display = True
 
-display = Inkplate()
-display.begin()
 
 try:
 
@@ -85,7 +117,6 @@ try:
         do_connect()
 
     if needs_time:
-        from timeutil import update_time
         print("Update time")
         update_time()
         print('Local time:', rtc.datetime())
@@ -124,7 +155,7 @@ try:
 
     needs_reset = not first_boot and last_temp is not None
 
-    print(f"Wait for tilt for {WAIT_FOR_TILT_SECONDS} secs, reboot on failuer: {needs_reset}")
+    print(f"Wait for tilt for {WAIT_FOR_TILT_SECONDS} secs, reboot on failure: {needs_reset}")
     current_temp, current_gravity = wait_for_tilt(seconds=WAIT_FOR_TILT_SECONDS, reboot_on_failure=needs_reset)
 
     if current_temp is None:
@@ -151,7 +182,6 @@ try:
             needs_send = True
     
         #212x104
-        display.setTextSize(2)
         degc_string = ""
         plato_string = ""
         if current_gravity is not None:
@@ -164,9 +194,24 @@ try:
 
         print(plato_string) 
         print(degc_string) 
-        display.printText(10, 85, plato_string, c=Inkplate.BLACK)
-        display.printText(120, 85, degc_string, c=Inkplate.BLACK)
+        print_display(plato_string, 10, 85, fontSize=2)
+        print_display(degc_string, 120, 85, fontSize=2)
         needs_display = True
+        if needs_mqtt:
+            CLIENT_NAME = 'tiltplate'
+            BROKER_ADDR = '192.168.10.222'
+            mqttc = MQTTClient(CLIENT_NAME, BROKER_ADDR, keepalive=60)
+            try:
+                mqttc.connect()        
+            except Exception as e:
+                print("Could update mqtt")
+                sys.print_exception(e)
+                print_display("Error", 147, 0, Inkplate.RED, fontSize=2, shadow=True)
+                print_display(str(e), 0, 0, Inkplate.WHITE, fontSize=1, shadow=True)
+                needs_display = True
+
+
+
 
     if needs_send:
         # https://docs.brewfather.app/integrations/custom-stream
@@ -189,12 +234,16 @@ try:
             except Exception as e:
                 print("Could update brewfather")
                 sys.print_exception(e)
-                display.printText(147, 1, "Error", c=Inkplate.BLACK)
-                display.printText(148, 0, "Error", c=Inkplate.BLACK)
-                display.printText(148, 1, "Error", c=Inkplate.BLACK)        
-                display.printText(149, 2, "Error", c=Inkplate.BLACK)        
-                display.printText(147, 0, "Error", c=Inkplate.WHITE)
+                print_display("Error", 147, 0, Inkplate.RED, fontSize=2, shadow=True)
+                print_display(str(e), 0, 0, Inkplate.WHITE, fontSize=1, shadow=True)
                 needs_display = True
+
+
+    tilt_update = format_time(time.time())
+    brewfather_update = format_time(last_update)
+    if last_update == 0:
+        brewfather_update = "n/a"
+    print_display(f"Tilt: {tilt_update} Brewfather: {brewfather_update}", 3, 70, Inkplate.WHITE, fontSize=1, shadow=True)
 
     if needs_display:
         print("Refresh display")
@@ -218,8 +267,4 @@ try:
 
 except Exception as e:
     print("Error")
-    sys.print_exception(e)
-    display.clearDisplay()
-    display.setTextSize(1)
-    display.printText(0, 0, str(e), c=Inkplate.BLACK)
-    display.display()    
+    display_error(e) 
